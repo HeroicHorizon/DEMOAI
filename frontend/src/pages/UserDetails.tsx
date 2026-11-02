@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getUser } from '../api/client';
 import { useNotify } from '../components/Notification';
+import { UserIcon } from '../components/UserIcon';
 import type { User } from '../types';
 
 export function UserDetails() {
@@ -31,7 +32,11 @@ export function UserDetails() {
   ];
   return (
     <section>
-      <h1>User Details</h1>
+      <div className="details-header">
+        <UserIcon size={48} />
+        <h1>User Details</h1>
+        <span>{`${user.firstName} ${user.lastName}`}</span>
+      </div>
       <dl className="details">
         {rows.map(([k, v]) => (
           <div key={k}>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { UserIcon } from './UserIcon';
 import type { User } from '../types';
 
 interface Props {
@@ -32,7 +33,9 @@ export function UsersTable({ users, onToggleStatus, onDelete }: Props) {
           {users.map((u) => (
             <tr key={u.id} data-testid="user-row">
               <td>{u.id}</td>
-              <td>{u.firstName}</td>
+              <td>
+                <UserIcon size={20} /> {u.firstName}
+              </td>
               <td>{u.lastName}</td>
               <td>{u.email}</td>
               <td>{u.phone}</td>

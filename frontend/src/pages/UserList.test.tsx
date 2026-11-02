@@ -102,3 +102,11 @@ it('shows the unreachable notification when the list fails', async () => {
   renderWithProviders(<UserList />);
   expect(await screen.findByText('Unable to reach the server. Please try again later.')).toBeInTheDocument();
 });
+
+it('renders a user icon in each row', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(listBody([makeUser(1), makeUser(2)])));
+  const { container } = renderWithProviders(<UserList />);
+  const rows = await screen.findAllByTestId('user-row');
+  expect(container.querySelectorAll('svg.user-icon')).toHaveLength(rows.length);
+  expect(screen.getByRole('columnheader', { name: 'First Name' })).toBeInTheDocument();
+});

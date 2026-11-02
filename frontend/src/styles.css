@@ -33,3 +33,5 @@ td.empty { text-align: center; padding: 2rem; color: #616e7c; }
 .note.success { background: #2e7d32; } .note.error { background: #c62828; }
 .details { display: grid; gap: 0.5rem; } .details div { display: flex; gap: 1rem; } .details dt { width: 140px; font-weight: 600; } .details dd { margin: 0; }
 @media (max-width: 600px) { main { padding: 1rem; } .topbar { gap: 1rem; } }
+.user-icon { color: #52606d; background: #e4e7eb; border-radius: 50%; flex-shrink: 0; vertical-align: middle; }
+.details-header { display: flex; align-items: center; gap: 0.75rem; }

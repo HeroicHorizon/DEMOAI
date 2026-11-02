@@ -186,3 +186,72 @@ func TestHealthz(t *testing.T) {
 	h := newServer(testutil.NewFakeRepo(), 1<<20)
 	assert.Equal(t, 200, do(h, "GET", "/healthz", "").Code)
 }
+
+type envelope struct {
+	Success bool           `json:"success"`
+	Data    map[string]any `json:"data"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func parseEnvelope(t *testing.T, rec *httptest.ResponseRecorder) envelope {
+	t.Helper()
+	var env envelope
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env), rec.Body.String())
+	return env
+}
+
+func TestGet_200EnvelopeShape(t *testing.T) {
+	h := newServer(testutil.NewFakeRepo(), 1<<20)
+	id := createUser(t, h, goodUser)
+	rec := do(h, "GET", "/api/v1/users/"+id, "")
+	require.Equal(t, http.StatusOK, rec.Code)
+	env := parseEnvelope(t, rec)
+	assert.True(t, env.Success)
+	assert.Equal(t, id, env.Data["id"])
+	assert.Equal(t, "john@example.com", env.Data["email"])
+	assert.Equal(t, "John", env.Data["firstName"])
+	assert.Nil(t, env.Error)
+}
+
+func TestGet_InvalidIDVariants(t *testing.T) {
+	h := newServer(testutil.NewFakeRepo(), 1<<20)
+	for _, id := range []string{"not-an-id", "%20", "5f8d0d55b54764421b7156c"} {
+		rec := do(h, "GET", "/api/v1/users/"+id, "")
+		assert.Equal(t, 400, rec.Code, id)
+		env := parseEnvelope(t, rec)
+		assert.False(t, env.Success)
+		require.NotNil(t, env.Error, id)
+		assert.Equal(t, "VALIDATION_ERROR", env.Error.Code)
+		assert.Equal(t, "Invalid user ID.", env.Error.Message)
+	}
+	rec := do(h, "GET", "/api/v1/users/5f8d0d55b54764421b7156c3", "")
+	assert.Equal(t, 404, rec.Code)
+	env := parseEnvelope(t, rec)
+	assert.False(t, env.Success)
+	require.NotNil(t, env.Error)
+	assert.Equal(t, "NOT_FOUND", env.Error.Code)
+	assert.Equal(t, "User not found.", env.Error.Message)
+}
+
+func TestGet_Unexpected500NoLeak(t *testing.T) {
+	repo := testutil.NewFakeRepo()
+	repo.Err = errors.New("boom db failure")
+	h := newServer(repo, 1<<20)
+	rec := do(h, "GET", "/api/v1/users/5f8d0d55b54764421b7156c3", "")
+	assert.Equal(t, 500, rec.Code)
+	env := parseEnvelope(t, rec)
+	assert.False(t, env.Success)
+	require.NotNil(t, env.Error)
+	assert.Equal(t, "INTERNAL_ERROR", env.Error.Code)
+	assert.NotContains(t, rec.Body.String(), "boom")
+}
+
+func TestGet_MissingID(t *testing.T) {
+	h := newServer(testutil.NewFakeRepo(), 1<<20)
+	rec := do(h, "GET", "/api/v1/users/", "")
+	// No route matches an empty id segment, so the router answers 404 (not the JSON envelope).
+	assert.Equal(t, 404, rec.Code)
+}

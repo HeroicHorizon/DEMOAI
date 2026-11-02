@@ -48,7 +48,9 @@ func TestLifecycleAgainstRealMongo(t *testing.T) {
 		return rec
 	}
 	stats := func() (int, int, int) {
-		var out struct{ Data struct{ Total, Active, Inactive int } }
+		var out struct {
+			Data struct{ Total, Active, Inactive int }
+		}
 		require.NoError(t, json.Unmarshal(do("GET", "/api/v1/users/stats", "").Body.Bytes(), &out))
 		return out.Data.Total, out.Data.Active, out.Data.Inactive
 	}
@@ -64,7 +66,18 @@ func TestLifecycleAgainstRealMongo(t *testing.T) {
 	assert.Equal(t, 409, do("POST", "/api/v1/users", `{"firstName":"J","lastName":"D","email":"john@example.com"}`).Code)
 
 	assert.Equal(t, 200, do("PUT", "/api/v1/users/"+id, `{"firstName":"Johnny","lastName":"Doe","email":"john@example.com"}`).Code)
-	assert.Contains(t, do("GET", "/api/v1/users/"+id, "").Body.String(), "Johnny")
+	rec = do("GET", "/api/v1/users/"+id, "")
+	assert.Equal(t, 200, rec.Code)
+	var got struct {
+		Success bool
+		Data    struct{ ID, Email, FirstName string }
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	assert.True(t, got.Success)
+	assert.Equal(t, id, got.Data.ID)
+	assert.Equal(t, "john@example.com", got.Data.Email)
+	assert.Equal(t, "Johnny", got.Data.FirstName)
+	assert.Equal(t, 400, do("GET", "/api/v1/users/not-an-id", "").Code)
 
 	assert.Equal(t, 200, do("PATCH", "/api/v1/users/"+id+"/status", `{"status":"INACTIVE"}`).Code)
 	tot, act, inact = stats()
@@ -89,6 +102,12 @@ func TestMongoUnavailableReturns503(t *testing.T) {
 		slog.New(slog.NewTextHandler(io.Discard, nil)))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/users", nil))
+	assert.Equal(t, 503, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "127.0.0.1")
+	assert.NotContains(t, rec.Body.String(), "mongodb://")
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/users/5f8d0d55b54764421b7156c3", nil))
 	assert.Equal(t, 503, rec.Code)
 	assert.NotContains(t, rec.Body.String(), "127.0.0.1")
 	assert.NotContains(t, rec.Body.String(), "mongodb://")

@@ -31,3 +31,15 @@ it('shows an error notification for a missing user', async () => {
   );
   expect(await screen.findByText('User not found.')).toBeInTheDocument();
 });
+
+it('shows the user icon', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: makeUser(4) })));
+  const { container } = renderWithProviders(
+    <Routes>
+      <Route path="/users/:id" element={<UserDetails />} />
+    </Routes>,
+    '/users/id4',
+  );
+  expect(await screen.findByText('First4 Last4')).toBeInTheDocument();
+  expect(container.querySelectorAll('svg.user-icon')).toHaveLength(1);
+});

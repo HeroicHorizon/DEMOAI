@@ -210,3 +210,17 @@ func TestDBUnavailable(t *testing.T) {
 	_, err = svc.Stats(context.Background())
 	assert.Equal(t, apperror.KindUnavailable, kindOf(t, err))
 }
+
+func TestGet_UnexpectedError(t *testing.T) {
+	svc, repo := setup()
+	repo.Err = errors.New("boom db failure")
+	_, err := svc.Get(context.Background(), "5f8d0d55b54764421b7156c3")
+	require.Error(t, err)
+	assert.Equal(t, apperror.KindInternal, apperror.As(err).Kind)
+}
+
+func TestGet_EmptyID(t *testing.T) {
+	svc, _ := setup()
+	_, err := svc.Get(context.Background(), "")
+	assert.Equal(t, apperror.KindValidation, kindOf(t, err))
+}

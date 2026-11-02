@@ -1,54 +1,47 @@
-# Approved plan (version 2)
+# Approved plan (version 3)
 
 - Repository: `HeroicHorizon/DEMOAI`, base branch `main` at `e1d84b7508b67d4228c1c9222a54e9eb921732a3`
-- Plan SHA-256: `6ff3a7fb53548c6df442ae69f72b4a468413229ccda68217003c600c73680b0e` (of the plan as approved; @​-mentions below are neutralised)
-- Approval record: https://github.com/HeroicHorizon/DEMOAI/issues/3#issuecomment-6585217625
+- Plan SHA-256: `ab99f00b593679e2e8940112412990f7aa1bd266b0065d7bdb20d99d7d956f72` (of the plan as approved; @​-mentions below are neutralised)
+- Approval record: https://github.com/HeroicHorizon/DEMOAI/issues/3#issuecomment-6585896120
 
 ---
 
 ## Summary
-The ForgeFlow backend already serves `GET /api/v1/users/{id}`. It is registered at `backend/internal/handler/user_handler.go:25` and handled by `get` and `UserService.Get`. It already returns 200, 400 for a malformed id, and 404 for a missing user. The 500 path comes from `apperror.As` and `FromMongo`. So this change adds no new route. It checks the existing endpoint against each acceptance criterion and fills the test gaps. Production code changes only if a new test shows a criterion is not met.
+The reviewer asks for a user icon in the UI. The backend plan from version 2 stays as it is: `GET /api/v1/users/{id}` already exists, and the work there is test coverage only. This revision adds a frontend change. A small `UserIcon` component shows a user avatar on the User Details page, which is the view that uses the Get User endpoint. The same icon also appears in the users list rows, so the UI is consistent. The icon is pure UI and needs no new backend field or API change.
 
 ## Acceptance criteria
-Copied from the request:
-1. A valid user ID returns that user's details.
-2. A found user returns 200 OK with the user's details in the response body.
-3. A user that does not exist returns 404 Not Found.
-4. An invalid or missing user ID returns 400 Bad Request.
-5. An unexpected server-side failure returns 500 Internal Server Error.
-6. The response follows the existing API response structure.
-7. Unit tests cover successful retrieval, user not found, invalid input, and unexpected errors.
-8. The endpoint is verified through API-level or integration tests.
+1–8. Unchanged from the approved plan (the Get User endpoint criteria, the response envelope, unit tests and API-level tests).
+9. The User Details page shows a user icon next to the user's name.
+10. The users list shows the same icon beside each user's name.
+11. The icon is decorative and does not change the existing text content or table column headers.
 
 ## Facts and assumptions
-- [fact] `GET /api/v1/users/{id}` is registered in `backend/internal/handler/user_handler.go:25`, and `get` returns `writeOK(w, 200, u, nil)` (`user_handler.go:81-88`).
-- [fact] `UserService.Get` calls `ParseID`, which returns `apperror.Validation("Invalid user ID.")` (HTTP 400) when `bson.ObjectIDFromHex` fails. Otherwise it calls `repo.GetByID` (`backend/internal/service/user_service.go:37-44` and `99-105`).
-- [fact] `apperror.FromMongo` maps `mongo.ErrNoDocuments` to NotFound (404), connection/timeout/context errors to Unavailable (503), and any other error to Internal (500) with the fixed message "An unexpected error occurred." (`backend/internal/apperror/apperror.go:78-94`).
-- [fact] The response envelope is `{success, data, meta, error{code,message,details}}` (`backend/internal/handler/response.go:12-23`).
-- [fact] `FakeRepo` has an `Err` field that makes every method return that error (`backend/internal/testutil/fakerepo.go:20-21`). It returns `apperror.NotFound` for an unknown id.
-- [fact] Existing tests for this endpoint:
-  - `TestCreateAndGet` and `TestGet_400And404` in `backend/internal/handler/user_handler_test.go`.
-  - `TestGet_MalformedID`, `TestGet_NotFound` and `TestGet_Found` in `backend/internal/service/user_service_test.go`.
-  - The real-MongoDB lifecycle test in `backend/internal/server/integration_test.go` calls GET by id. It skips unless `MONGODB_TEST_URI` is set.
-- [fact] No existing test asserts a 500 for GET by id. No test asserts the error envelope fields (`success`, `error.code`) for GET by id. No test covers a missing or blank id.
-- [fact] `README.md:52` already documents `GET /api/v1/users/{id}` as "Details (400 malformed id, 404 missing)".
-- [fact] `backend/go.mod` pins Go 1.27.3, testify v1.10.0 and mongo-driver v2.2.0. Go 1.27.3 is installed.
-- [fact] `openspec/specs/feature-demo/spec.md` is the existing spec. The earlier demo change is archived.
-- [assumption] None.
+- [fact] `frontend/src/pages/UserDetails.tsx` renders an `<h1>User Details</h1>` and a `<dl className="details">` of rows. It has no icon or avatar.
+- [fact] `frontend/src/components/UsersTable.tsx` renders `u.firstName` and `u.lastName` in separate cells and has no icon.
+- [fact] The `User` type (`frontend/src/types.ts`) has no avatar or image field, and the API returns none.
+- [fact] `frontend/src/pages/UserList.test.tsx` asserts the exact column header names with `getByRole('columnheader', { name })`. It also asserts the cell text `user1@​example.com`.
+- [fact] `frontend/src/pages/UserDetails.test.tsx` uses `getByText` on each value, such as `id4`, `First4` and `ACTIVE`. Each value must therefore stay in its own element, and the icon must not duplicate any text.
+- [fact] `frontend/src/styles.css` holds all styling, including `.badge` and `.details`. The frontend uses React 18, Vite, Vitest and Testing Library (`frontend/package.json`). `npm test` runs `vitest run`.
+- [fact] Node 22 and npm 10 are installed in the container.
+- [assumption] "User Icon" means a generic person glyph or an initials avatar, not an uploaded profile picture. The plan builds an inline SVG person glyph, because that needs no new dependency, no new data and no backend change.
+- [assumption] The icon goes on the Details page and in the list rows. The reviewer didn't say where.
 
 ## Open questions
-1. The endpoint already exists. Is the intent only to verify it and add the missing tests, or is a different endpoint shape expected? The request lists `/User/userID` and "Add HTTP Query Method for Get User" as out of scope, and that is unclear. This plan keeps the existing route and adds no new one.
-2. What should "missing" user ID mean? The Go router decides what `GET /api/v1/users/` returns, and I have not run it to see. The plan has a test record the actual status and body. If it is not a 400 with the standard error envelope, someone needs to decide whether to add a route or accept the behavior.
+1. Should the icon be a generic person glyph or an avatar showing the user's initials?
+   - Generic person glyph (inline SVG) (Recommended)
+   - Initials avatar from first and last name
+   - Uploaded profile picture (needs a backend field, so it is a larger change)
+2. Where should the icon appear?
+   - User Details page and the users list rows (Recommended)
+   - User Details page only
 
 ## Tasks
-1. In `backend/internal/handler/user_handler_test.go`, add a test that parses the 200 response of GET by id. It checks `success=true`, `data.id`, `data.email` and `data.firstName`, and that there is no `error` field.
-2. In the same file, extend the 400 and 404 coverage to parse the body. It checks `success` is false, `error.code` is `VALIDATION_ERROR` or `NOT_FOUND`, and `error.message` is "Invalid user ID." or "User not found.". Include a whitespace id (`%20`) and a wrong-length hex id.
-3. In the same file, add a 500 test. Set `repo.Err = errors.New("boom db failure")`, which avoids the words "connection" and "server selection". GET a valid ObjectID hex and expect 500, code `INTERNAL_ERROR`, and a body that does not contain the raw error text.
-4. In the same file, add a test for the missing-id request `GET /api/v1/users/`. It asserts the status the router actually returns, then resolves open question 2.
-5. In `backend/internal/service/user_service_test.go`, add `TestGet_UnexpectedError`. With `repo.Err` set to a generic error, `Get` returns an `apperror.Error` of kind `KindInternal`. Add `TestGet_EmptyID`, which expects `KindValidation`.
-6. In `backend/internal/server/integration_test.go`, extend `TestMongoUnavailableReturns503` to GET `/api/v1/users/5f8d0d55b54764421b7156c3` and expect 503 with no leaked host. This runs without MongoDB. In the real-MongoDB lifecycle test, add an assertion on the 200 body shape and a 400 for a bad id.
-7. Only if a new test fails, make the smallest fix in `user_handler.go`, `user_service.go` or `apperror.go`. Otherwise leave production code unchanged.
-8. If the behavior from task 4 deserves documenting, update the `README.md:52` row to match. Otherwise leave `README.md` alone.
+1. Create `frontend/src/components/UserIcon.tsx`. It exports `UserIcon({ size?: number })`, an inline SVG person glyph with `aria-hidden="true"`, `focusable="false"` and `className="user-icon"`. It uses no new dependency.
+2. In `frontend/src/pages/UserDetails.tsx`, wrap the heading in a header row. Put `<UserIcon size={48} />` beside the `<h1>User Details</h1>`, and show the full name next to it as a caption. Keep the existing `dl` rows unchanged, so the `getByText` assertions still match one element each. Render the name caption in a way that doesn't make `First4` or `Last4` match twice (for example, only the combined `First4 Last4` text node).
+3. In `frontend/src/components/UsersTable.tsx`, render `<UserIcon size={20} />` inside the First Name cell, before the name text. Keep the header labels and column count (11) unchanged.
+4. In `frontend/src/styles.css`, add `.user-icon` (colour, circular background, `flex-shrink: 0`) and a `.details-header { display: flex; align-items: center; gap: 0.75rem; }` rule.
+5. Add the frontend tests listed in the Test plan.
+6. Backend tasks 1–8 from the approved plan stay as they are (`user_handler_test.go`, `user_service_test.go`, `integration_test.go`, and only if a test fails, a fix in `user_handler.go`, `user_service.go` or `apperror.go`).
 
 ## Diagram
 ```mermaid
@@ -62,39 +55,52 @@ flowchart LR
   P -->|ErrNoDocuments| E404[404 NOT_FOUND]
   P -->|DB unreachable| E503[503 SERVICE_UNAVAILABLE]
   P -->|other error| E500[500 INTERNAL_ERROR]
+  OK --> UI[UserDetails page]
+  UI --> IC[UserIcon + name + detail rows]
+  L[UsersTable rows] --> IC2[UserIcon]
 ```
 
 ## Risks
-- The real-MongoDB integration test is skipped unless `MONGODB_TEST_URI` is set, and MongoDB is not installed in the container. The repository-level GET path against real MongoDB can't be verified here. API-level coverage comes from the router with `FakeRepo`.
-- The behavior for a missing id (task 4) is not yet known. It may not be a 400 with the standard envelope.
-- Open question 1 could change the scope if a different endpoint is wanted.
+- Wording like "user Icon" is ambiguous (see open questions). A picture upload would need a model, API and storage change that this plan does not include.
+- Adding the icon or name text could create duplicate text matches in existing `getByText` tests. The tasks guard against this, and the existing tests must still pass unchanged.
+- The real-MongoDB integration test is skipped without `MONGODB_TEST_URI`, and MongoDB is not installed here. API-level coverage comes from the router with `FakeRepo`.
+- The behaviour for a missing id (`GET /api/v1/users/`) is not yet known, as before.
+- Icon appearance can't be checked visually here. Tests only check that the icon renders.
 
 ## Impact
-- Backend test files only: `user_handler_test.go`, `user_service_test.go` and `integration_test.go`.
-- Possibly a small fix in the handler, service or apperror code if a test fails, and a `README.md` row.
-- The frontend, Docker setup and API contract are untouched.
+- Frontend: new `UserIcon.tsx`, edits to `UserDetails.tsx`, `UsersTable.tsx` and `styles.css`, plus new tests.
+- Backend: test files only, as in the approved plan.
+- No API contract, database, Docker or dependency changes.
 
 ## Toolchain
 - Go 1.27.3 (pinned in `backend/go.mod`): already installed.
 - Go modules (testify v1.10.0, mongo-driver v2.2.0): fetched by `go mod download`.
-- Node and npm: not needed, because the frontend is unchanged.
+- Node 22.23.4 and npm 10.9.9: already installed. The frontend needs them (React 18, Vite 5, Vitest 2, TypeScript 5.6, versions as pinned in `frontend/package.json` and `package-lock.json`).
 - MongoDB: optional and not installed. It is only needed for the skipped integration test.
 
 ## Test plan
-All tests use Go's `testing` package with testify, in `backend/internal/...`.
-- `handler.TestGet_200EnvelopeShape` in `user_handler_test.go` covers criteria 1, 2 and 6.
-- `handler.TestGet_400And404` (extended) and `handler.TestGet_InvalidIDVariants` in `user_handler_test.go` cover criteria 3, 4 and 6.
-- `handler.TestGet_Unexpected500NoLeak` in `user_handler_test.go` covers criteria 5 and 6.
-- `handler.TestGet_MissingID` in `user_handler_test.go` covers criterion 4 and open question 2.
-- `service.TestGet_UnexpectedError` and `service.TestGet_EmptyID` in `user_service_test.go` cover criteria 4, 5 and 7. The existing `TestGet_Found`, `TestGet_NotFound` and `TestGet_MalformedID` cover the success, not-found and invalid-input cases.
-- `server.TestMongoUnavailableReturns503` (extended with GET by id) and `server.TestLifecycleAgainstRealMongo` (extended) in `integration_test.go` cover criterion 8.
+Backend (Go `testing` with testify, in `backend/internal/...`), unchanged from the approved plan:
+- `handler.TestGet_200EnvelopeShape` covers criteria 1, 2 and 6.
+- `handler.TestGet_400And404` (extended) and `handler.TestGet_InvalidIDVariants` cover criteria 3, 4 and 6.
+- `handler.TestGet_Unexpected500NoLeak` covers criteria 5 and 6.
+- `handler.TestGet_MissingID` covers criterion 4.
+- `service.TestGet_UnexpectedError` and `service.TestGet_EmptyID` in `user_service_test.go` cover criteria 4, 5 and 7.
+- `server.TestMongoUnavailableReturns503` (extended with GET by id) and `server.TestLifecycleAgainstRealMongo` (extended) cover criterion 8.
+
+Frontend (Vitest and Testing Library):
+- `frontend/src/components/UserIcon.test.tsx`: `renders an svg hidden from assistive tech` checks `aria-hidden="true"` and `size` applied to width and height. It covers criteria 9 and 11.
+- `frontend/src/pages/UserDetails.test.tsx`: `shows the user icon` checks that the `.user-icon` svg is present once the user loads, and that the existing field-value assertions still pass. It covers criteria 9 and 11.
+- `frontend/src/pages/UserList.test.tsx`: `renders a user icon in each row` checks that the number of `.user-icon` elements equals the number of `user-row` rows, and that the existing header assertions still pass. It covers criteria 10 and 11.
 
 ## Commands
 ```
 setup: cd backend && go mod download
+setup: cd frontend && npm ci
 build: cd backend && go build ./... && go vet ./...
+build: cd frontend && npm run build
 test: cd backend && go test -v -count=1 ./...
+test: cd frontend && npx vitest run --reporter=verbose
 ```
 
 ## Complexity
-S: the endpoint already exists, so the work is a handful of backend tests, plus a small fix only if a test fails.
+S: the icon is one small component, two small edits and some CSS, plus the backend tests that were already planned. No backend production changes are expected.
